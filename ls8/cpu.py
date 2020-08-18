@@ -7,29 +7,44 @@ class CPU:
 
     def __init__(self):
         """Construct a new CPU."""
-        pass
+        self.ram = [None] * 256
+        self.reg = [None] * 8
 
+        # program counter
+        self.pc = 0
+        
+        self.LDI = 0b10000010
+        self.PRN = 0b01000111
+        self.HLT = 0b00000001
+        
     def load(self):
         """Load a program into memory."""
 
         address = 0
 
         # For now, we've just hardcoded a program:
-
+        # instructions
         program = [
             # From print8.ls8
-            0b10000010, # LDI R0,8
+            self.LDI, # LDI R0,8
             0b00000000,
             0b00001000,
-            0b01000111, # PRN R0
+            self.PRN, # PRN R0
             0b00000000,
-            0b00000001, # HLT
+            self.HLT, # HLT
         ]
 
         for instruction in program:
             self.ram[address] = instruction
             address += 1
 
+    # MDR === Memory Address Register (index)
+    def ram_read(self, MAR):
+        return self.ram[MAR]
+
+    # MDR === Memory Data Register (value)
+    def ram_write(self, MDR, MAR):
+        self.ram[MAR] = MDR
 
     def alu(self, op, reg_a, reg_b):
         """ALU operations."""
@@ -62,4 +77,36 @@ class CPU:
 
     def run(self):
         """Run the CPU."""
-        pass
+        running = True
+
+        
+
+        while running:
+            op_size = 1
+            
+            # Istruction Register - It needs to read the memory address that's stored in register PC, and store that result in IR
+            ir = self.ram_read(self.pc)
+
+            if ir == self.HLT:
+                running = False
+            elif ir == self.LDI: # sets a specified register to  a specified value
+                # memory address register (index)
+                reg_index = self.ram_read(self.pc + 1)
+                # memory data register (value)
+                value = self.ram_read(self.pc + 2)
+                
+                # save in register
+                self.reg[reg_index] = value
+                
+                # Operation size
+                op_size = 3
+            elif ir == self.PRN:
+                # memory address register (index)
+                reg_index = self.ram_read(self.pc + 1)
+                
+                print(self.reg[reg_index])
+                
+                op_size = 2
+
+            # update program counter
+            self.pc += op_size
