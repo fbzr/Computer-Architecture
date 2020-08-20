@@ -59,8 +59,8 @@ class CPU:
         self.branchtable[self.PRN] = self.op_prn
         self.branchtable[self.PUSH] = self.op_push
         self.branchtable[self.POP] = self.op_pop
-        # self.branchtable[CALL] = self.handle_call
-        # self.branchtable[RET] = self.handle_ret
+        self.branchtable[self.CALL] = self.op_call
+        self.branchtable[self.RET] = self.op_ret
         
 
         
@@ -206,6 +206,38 @@ class CPU:
         # increment stack pointer
         self.sp += 1
 
+    def op_call(self):
+        # Get the address of the instruction directly after CALL
+        return_address = self.pc + 2
+
+        # Push it onto the stack
+        ## Decrement the Stack Pointer
+        self.sp -= 1
+
+        ## Store the return address at the top of the stack
+        self.ram_write(return_address,self.sp)
+
+        # read register index to get address to jump to
+        reg_index = self.ram_read(self.pc + 1)
+
+        # get address stored in register
+        address = self.reg[reg_index]
+
+        # Set the PC to that address
+        self.pc = address
+
+    def op_ret(self):
+        # Pop the address at the top of the stack
+
+        ## Get the address pointed to by the Stack Pointer
+        address = self.ram_read(self.reg[self.sp])
+
+        ## Increment the Stack Pointer
+        self.reg[self.sp] += 1
+
+        ## Point to PC to that address
+        self.pc = address
+
     def run(self):
         """Run the CPU."""
         self.running = True
@@ -223,6 +255,9 @@ class CPU:
             # call the action function that matches on the table
             self.branchtable[self.ir]()
 
-            # update program counter
-            self.pc += op_size
+            # Check if this instruction sets the PC directly
+            updated_pc = (self.ir >> 4) & 0b0001
+            if not updated_pc:
+                # update program counter
+                self.pc += op_size
 
