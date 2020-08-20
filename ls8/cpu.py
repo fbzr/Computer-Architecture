@@ -56,7 +56,8 @@ class CPU:
         self.RET = 0b00010001
         self.CMP = 0b10100111
         self.JNE = 0b01010110
-        self.JEQ = -0b01010101
+        self.JEQ = 0b01010101
+        self.JMP = 0b01010100
         
         # Set up a branch table
         self.branchtable = {}
@@ -73,7 +74,8 @@ class CPU:
         self.branchtable[self.DIV] = self.op_div
         self.branchtable[self.CMP] = self.op_cmp
         self.branchtable[self.JNE] = self.op_jne
-
+        self.branchtable[self.JEQ] = self.op_jeq
+        self.branchtable[self.JMP] = self.op_jmp
         
     def load(self):
         """Load a program into memory."""
@@ -275,10 +277,33 @@ class CPU:
         if not self.fl & 0b00000001:
             # jump to the address stored in the given register.
             # read address 
-            address = self.ram_read(self.pc + 1)
-            self.pc = address
+            reg_index = self.ram_read(self.pc + 1)
+            self.pc = self.reg[reg_index]
         else:
             self.pc += (self.ir >> 6) + 1
+    
+    def op_jeq(self):
+        '''
+        JEQ register
+        If equal flag is set (true), jump to the address stored in the given register.
+        '''
+        # FL bits: 00000LGE
+        # If E flag is true, 1, 
+        if not self.fl & 0b00000001:
+            # jump to the address stored in the given register.
+            # read address 
+            reg_index = self.ram_read(self.pc + 1)
+            self.pc = self.reg[reg_index]
+        else:
+            self.pc += (self.ir >> 6) + 1
+
+    def op_jmp(self):
+        '''
+        Jump to the address stored in the given register.
+        Set the PC to the address stored in the given register.
+        '''
+        reg_index = self.ram_read(self.pc + 1)
+        self.pc = self.reg[reg_index]
 
     def run(self):
         """Run the CPU.
@@ -290,6 +315,7 @@ class CPU:
         self.running = True
 
         while self.running:            
+            self.trace()
             # Instruction Register - contains a copy of the currently executing
             # instruction
             self.ir = self.ram_read(self.pc)
@@ -298,8 +324,12 @@ class CPU:
             # get program counter from command
             op_size = (self.ir >> 6) + 1
   
-            # call the action function that matches on the table
-            self.branchtable[self.ir]()
+            try:
+                # call the action function that matches on the table
+                self.branchtable[self.ir]()
+            except KeyError:
+                print(f'Invalid operation: {self.ir}')
+                sys.exit()
 
             # AABCDDDD
             # C 1 if this instruction sets the PC
