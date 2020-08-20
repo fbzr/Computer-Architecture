@@ -7,18 +7,18 @@ class CPU:
     """Main CPU class."""
 
     def __init__(self):
-        """Construct a new CPU."""
-        self.ram = [None] * 256
+        """Construct a new CPU.
+        When the LS-8 is booted, the following steps occur:
 
-        # reserved
-        # self.ram[0xF7] = 
-        # self.ram[0xF6] = 
-        # self.ram[0xF5] = 
+        R0-R6 are cleared to 0.
+        R7 is set to 0xF4.
+        PC and FL registers are cleared to 0.
+        RAM is cleared to 0.
+        """
+        self.ram = [0] * 256
 
         # 8 general-purpose 8-bit numeric registers R0-R7.
-        self.reg = [None] * 8
-
-        
+        self.reg = [0] * 8
         # stack pointer
         self.SP = 7
         # Initialize the SP to address 0xF4
@@ -36,6 +36,8 @@ class CPU:
 
         # program counter
         self.pc = 0
+        # Flag
+        self.fl = 0b00000000
 
         self.running = False
         
@@ -52,6 +54,9 @@ class CPU:
         self.POP = 0b01000110
         self.CALL = 0b01010000
         self.RET = 0b00010001
+        self.CMP = 0b10100111
+        self.JNE = 0b01010110
+        self.JEQ = -0b01010101
         
         # Set up a branch table
         self.branchtable = {}
@@ -66,7 +71,8 @@ class CPU:
         self.branchtable[self.MUL] = self.op_mul
         self.branchtable[self.SUB] = self.op_sub
         self.branchtable[self.DIV] = self.op_div
-        
+        self.branchtable[self.CMP] = self.op_cmp
+        self.branchtable[self.JNE] = self.op_jne
 
         
     def load(self):
@@ -109,15 +115,43 @@ class CPU:
 
         if op == "ADD":
             self.reg[reg_a] += self.reg[reg_b]
+        
         elif op == "SUB":
             self.reg[reg_a] -= self.reg[reg_b]
+        
         elif op == "MUL": 
             #Multiply the values in two registers together and store the result in registerA.
             self.reg[reg_a] *= self.reg[reg_b]
+        
         elif op == "DIV":
             self.reg[reg_a] /= self.reg[reg_b]
+        
         elif op == "SHL":
             self.reg[reg_a] <<= self.reg[reg_b]
+        
+        elif op == "CMP":
+            '''
+            CMP registerA registerB
+            Compare the values in two registers.
+            If they are equal, set the Equal E flag to 1, otherwise set it to 0.
+            If registerA is less than registerB, set the Less-than L flag to 1, otherwise set it to 0.
+            If registerA is greater than registerB, set the Greater-than G flag to 1, otherwise set it to 0.
+
+            FL bits: 00000LGE
+            L Less-than: during a CMP, set to 1 if registerA is less than registerB, zero otherwise.
+            G Greater-than: during a CMP, set to 1 if registerA is greater than registerB, zero otherwise.
+            E Equal: during a CMP, set to 1 if registerA is equal to registerB, zero otherwise.
+            '''
+            # initialize with equal value
+            self.fl = 0b00000001
+
+            # check if values are different
+            if (self.reg[reg_a] > self.reg[reg_b]):
+                self.fl <<= 1
+            elif (self.reg[reg_a] > self.reg[reg_b]):
+                self.fl <<= 2
+
+
         else:
             raise Exception("Unsupported ALU operation")
 
@@ -155,6 +189,9 @@ class CPU:
 
     def op_shl(self):
         self.alu("SHL")
+
+    def op_cmp(self):
+        self.alu("CMP")
 
 
     def op_hlt(self):
@@ -232,8 +269,24 @@ class CPU:
         # Assign PC to that address
         self.pc = address
 
+    def op_jne(self):
+        # FL bits: 00000LGE
+        # If E flag is clear (false, 0), 
+        if not self.fl & 0b00000001:
+            # jump to the address stored in the given register.
+            # read address 
+            address = self.ram_read(self.pc + 1)
+            self.pc = address
+        else:
+            self.pc += (self.ir >> 6) + 1
+
     def run(self):
-        """Run the CPU."""
+        """Run the CPU.
+        Execution Sequence
+        The instruction pointed to by the PC is fetched from RAM, decoded, and executed.
+        If the instruction does not set the PC itself, the PC is advanced to point to the subsequent instruction.
+        If the CPU is not halted by a HLT instruction, go to step 1.
+        """
         self.running = True
 
         while self.running:            
@@ -243,7 +296,7 @@ class CPU:
 
             # AABCDDDD -> AA Number of operands for this opcode, 0-2
             # get program counter from command
-            op_size = ((self.ir >> 6) & 0b11) + 1
+            op_size = (self.ir >> 6) + 1
   
             # call the action function that matches on the table
             self.branchtable[self.ir]()
