@@ -18,10 +18,11 @@ class CPU:
         # 8 general-purpose 8-bit numeric registers R0-R7.
         self.reg = [None] * 8
 
+        
         # stack pointer
-        self.sp = 0xF4
+        self.SP = 7
         # Initialize the SP to address 0xF4
-        self.reg[7] = self.sp
+        self.reg[self.SP] = 0xF4
 
         # R5 is reserved as the interrupt mask (IM)
         # R6 is reserved as the interrupt status (IS)
@@ -61,6 +62,10 @@ class CPU:
         self.branchtable[self.POP] = self.op_pop
         self.branchtable[self.CALL] = self.op_call
         self.branchtable[self.RET] = self.op_ret
+        self.branchtable[self.ADD] = self.op_add
+        self.branchtable[self.MUL] = self.op_mul
+        self.branchtable[self.SUB] = self.op_sub
+        self.branchtable[self.DIV] = self.op_div
         
 
         
@@ -86,21 +91,7 @@ class CPU:
             sys.exit("Command line argument is required")
         except FileNotFoundError:
             sys.exit("Invalid file")
-        
-        # For now, we've just hardcoded a program:
-        # instructions
-        # program = [
-        #     # From print8.ls8
-        #     self.LDI, # LDI R0,8
-        #     0b00000000,
-        #     0b00001000,
-        #     self.PRN, # PRN R0
-        #     0b00000000,
-        #     self.HLT, # HLT
-        # ]
-        # for instruction in program:
-        #     self.ram[address] = instruction
-        #     address += 1
+
 
     # MDR === Memory Address Register (index)
     def ram_read(self, MAR):
@@ -123,6 +114,8 @@ class CPU:
         elif op == "MUL": 
             #Multiply the values in two registers together and store the result in registerA.
             self.reg[reg_a] *= self.reg[reg_b]
+        elif op == "DIV":
+            self.reg[reg_a] /= self.reg[reg_b]
         elif op == "SHL":
             self.reg[reg_a] <<= self.reg[reg_b]
         else:
@@ -156,6 +149,9 @@ class CPU:
 
     def op_mul(self):
         self.alu("MUL")
+    
+    def op_div(self):
+        self.alu("DIV")
 
     def op_shl(self):
         self.alu("SHL")
@@ -182,7 +178,7 @@ class CPU:
 
     def op_push(self):
         # Decrement the Stack Pointer
-        self.sp -= 1
+        self.reg[self.SP] -= 1
 
         # read the register index from ram
         reg_index = self.ram_read(self.pc + 1)
@@ -191,11 +187,11 @@ class CPU:
         value = self.reg[reg_index]
 
         # update stack
-        self.ram_write(value, self.sp)
+        self.ram_write(value, self.reg[self.SP])
 
     def op_pop(self):
         # read value from stack
-        value = self.ram_read(self.sp)
+        value = self.ram_read(self.reg[self.SP])
 
         # Get the register index number to copy into
         reg_index = self.ram_read(self.pc + 1)
@@ -204,7 +200,7 @@ class CPU:
         self.reg[reg_index] = value
 
         # increment stack pointer
-        self.sp += 1
+        self.reg[self.SP] += 1
 
     def op_call(self):
         # Get the address of the instruction directly after CALL
@@ -212,10 +208,10 @@ class CPU:
 
         # Push it onto the stack
         ## Decrement the Stack Pointer
-        self.sp -= 1
+        self.reg[self.SP] -= 1
 
         ## Store the return address at the top of the stack
-        self.ram_write(return_address,self.sp)
+        self.ram_write(return_address,self.reg[self.SP])
 
         # read register index to get address to jump to
         reg_index = self.ram_read(self.pc + 1)
@@ -229,32 +225,31 @@ class CPU:
     def op_ret(self):
         # Pop the address at the top of the stack
 
-        ## Get the address pointed to by the Stack Pointer
-        address = self.ram_read(self.reg[self.sp])
-
-        ## Increment the Stack Pointer
-        self.reg[self.sp] += 1
-
-        ## Point to PC to that address
+        # Get the address pointed to by the Stack Pointer
+        address = self.ram_read(self.reg[self.SP])
+        # increment the Stack Pointer
+        self.reg[self.SP] += 1
+        # Assign PC to that address
         self.pc = address
 
     def run(self):
         """Run the CPU."""
         self.running = True
 
-        while self.running:
-            op_size = 1
-            
+        while self.running:            
             # Instruction Register - contains a copy of the currently executing
             # instruction
             self.ir = self.ram_read(self.pc)
 
+            # AABCDDDD -> AA Number of operands for this opcode, 0-2
             # get program counter from command
             op_size = ((self.ir >> 6) & 0b11) + 1
   
             # call the action function that matches on the table
             self.branchtable[self.ir]()
 
+            # AABCDDDD
+            # C 1 if this instruction sets the PC
             # Check if this instruction sets the PC directly
             updated_pc = (self.ir >> 4) & 0b0001
             if not updated_pc:
