@@ -58,6 +58,7 @@ class CPU:
         self.JNE = 0b01010110
         self.JEQ = 0b01010101
         self.JMP = 0b01010100
+        self.SHL = 0b10101100 
         
         # Set up a branch table
         self.branchtable = {}
@@ -68,11 +69,6 @@ class CPU:
         self.branchtable[self.POP] = self.op_pop
         self.branchtable[self.CALL] = self.op_call
         self.branchtable[self.RET] = self.op_ret
-        self.branchtable[self.ADD] = self.op_add
-        self.branchtable[self.MUL] = self.op_mul
-        self.branchtable[self.SUB] = self.op_sub
-        self.branchtable[self.DIV] = self.op_div
-        self.branchtable[self.CMP] = self.op_cmp
         self.branchtable[self.JNE] = self.op_jne
         self.branchtable[self.JEQ] = self.op_jeq
         self.branchtable[self.JMP] = self.op_jmp
@@ -110,28 +106,28 @@ class CPU:
         self.ram[MAR] = MDR
 
 
-    def alu(self, op):
+    def alu(self):
         """ALU operations."""
         reg_a = self.ram_read(self.pc + 1)
         reg_b = self.ram_read(self.pc + 2)
 
-        if op == "ADD":
+        if self.ir == self.ADD:
             self.reg[reg_a] += self.reg[reg_b]
         
-        elif op == "SUB":
+        elif self.ir == self.SUB:
             self.reg[reg_a] -= self.reg[reg_b]
         
-        elif op == "MUL": 
+        elif self.ir == self.MUL: 
             #Multiply the values in two registers together and store the result in registerA.
             self.reg[reg_a] *= self.reg[reg_b]
         
-        elif op == "DIV":
+        elif self.ir == self.DIV:
             self.reg[reg_a] /= self.reg[reg_b]
         
-        elif op == "SHL":
+        elif self.ir == self.SHL:
             self.reg[reg_a] <<= self.reg[reg_b]
         
-        elif op == "CMP":
+        elif self.ir == self.CMP:
             '''
             CMP registerA registerB
             Compare the values in two registers.
@@ -175,25 +171,6 @@ class CPU:
             print(" %02X" % self.reg[i], end='')
 
         print()
-
-    def op_add(self):
-        self.alu("ADD")
-
-    def op_sub(self):
-        self.alu("SUB")
-
-    def op_mul(self):
-        self.alu("MUL")
-    
-    def op_div(self):
-        self.alu("DIV")
-
-    def op_shl(self):
-        self.alu("SHL")
-
-    def op_cmp(self):
-        self.alu("CMP")
-
 
     def op_hlt(self):
         self.running = False
@@ -326,8 +303,13 @@ class CPU:
             op_size = (self.ir >> 6) + 1
   
             try:
-                # call the action function that matches on the table
-                self.branchtable[self.ir]()
+                # AABCDDDD: B 1 if this is an ALU operation
+                # check if it's an ALU operation
+                if (self.ir >> 5) & 0b1:
+                    self.alu()
+                else:
+                    # call the action function that matches on the table
+                    self.branchtable[self.ir]()
             except KeyError:
                 print(f'Invalid operation: {self.ir}')
                 sys.exit()
