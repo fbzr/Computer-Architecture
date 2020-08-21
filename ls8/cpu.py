@@ -150,9 +150,8 @@ class CPU:
             # check if values are different
             if (self.reg[reg_a] > self.reg[reg_b]):
                 self.fl <<= 1
-            elif (self.reg[reg_a] > self.reg[reg_b]):
+            elif (self.reg[reg_a] < self.reg[reg_b]):
                 self.fl <<= 2
-
 
         else:
             raise Exception("Unsupported ALU operation")
@@ -289,7 +288,7 @@ class CPU:
         '''
         # FL bits: 00000LGE
         # If E flag is true, 1, 
-        if not self.fl & 0b00000001:
+        if self.fl & 0b00000001:
             # jump to the address stored in the given register.
             # read address 
             reg_index = self.ram_read(self.pc + 1)
@@ -314,8 +313,10 @@ class CPU:
         """
         self.running = True
 
-        while self.running:            
-            self.trace()
+        while self.running:          
+            # # debug helper  
+            # self.trace()
+
             # Instruction Register - contains a copy of the currently executing
             # instruction
             self.ir = self.ram_read(self.pc)
