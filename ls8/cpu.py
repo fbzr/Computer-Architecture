@@ -57,9 +57,15 @@ class CPU:
         self.CMP = 0b10100111
         self.JNE = 0b01010110
         self.JEQ = 0b01010101
-        self.JMP = 0b01010100
-        self.SHL = 0b10101100 
-        
+        self.JMP = 0b01010100 
+        self.AND = 0b10101000
+        self.OR = 0b10101010
+        self.XOR = 0b10101011
+        self.NOT = 0b01101001
+        self.SHL = 0b10101100
+        self.SHR = 0b10101101
+        self.MOD = 0b10100100
+
         # Set up a branch table
         self.branchtable = {}
         self.branchtable[self.HLT] = self.op_hlt
@@ -105,52 +111,70 @@ class CPU:
     def ram_write(self, MDR, MAR):
         self.ram[MAR] = MDR
 
-
     def alu(self):
         """ALU operations."""
         reg_a = self.ram_read(self.pc + 1)
         reg_b = self.ram_read(self.pc + 2)
 
-        if self.ir == self.ADD:
-            self.reg[reg_a] += self.reg[reg_b]
-        
-        elif self.ir == self.SUB:
-            self.reg[reg_a] -= self.reg[reg_b]
-        
-        elif self.ir == self.MUL: 
-            #Multiply the values in two registers together and store the result in registerA.
-            self.reg[reg_a] *= self.reg[reg_b]
-        
-        elif self.ir == self.DIV:
-            self.reg[reg_a] /= self.reg[reg_b]
-        
-        elif self.ir == self.SHL:
-            self.reg[reg_a] <<= self.reg[reg_b]
-        
-        elif self.ir == self.CMP:
-            '''
-            CMP registerA registerB
-            Compare the values in two registers.
-            If they are equal, set the Equal E flag to 1, otherwise set it to 0.
-            If registerA is less than registerB, set the Less-than L flag to 1, otherwise set it to 0.
-            If registerA is greater than registerB, set the Greater-than G flag to 1, otherwise set it to 0.
+        try:
+            if self.ir == self.ADD:
+                self.reg[reg_a] += self.reg[reg_b]
+            
+            elif self.ir == self.SUB:
+                self.reg[reg_a] -= self.reg[reg_b]
+            
+            elif self.ir == self.MUL: 
+                #Multiply the values in two registers together and store the result in registerA.
+                self.reg[reg_a] *= self.reg[reg_b]
+            
+            elif self.ir == self.DIV:
+                self.reg[reg_a] /= self.reg[reg_b]
+            
+            elif self.ir == self.CMP:
+                '''
+                CMP registerA registerB
+                Compare the values in two registers.
+                If they are equal, set the Equal E flag to 1, otherwise set it to 0.
+                If registerA is less than registerB, set the Less-than L flag to 1, otherwise set it to 0.
+                If registerA is greater than registerB, set the Greater-than G flag to 1, otherwise set it to 0.
 
-            FL bits: 00000LGE
-            L Less-than: during a CMP, set to 1 if registerA is less than registerB, zero otherwise.
-            G Greater-than: during a CMP, set to 1 if registerA is greater than registerB, zero otherwise.
-            E Equal: during a CMP, set to 1 if registerA is equal to registerB, zero otherwise.
-            '''
-            # initialize with equal value
-            self.fl = 0b00000001
+                FL bits: 00000LGE
+                L Less-than: during a CMP, set to 1 if registerA is less than registerB, zero otherwise.
+                G Greater-than: during a CMP, set to 1 if registerA is greater than registerB, zero otherwise.
+                E Equal: during a CMP, set to 1 if registerA is equal to registerB, zero otherwise.
+                '''
+                # initialize with equal value
+                self.fl = 0b00000001
 
-            # check if values are different
-            if (self.reg[reg_a] > self.reg[reg_b]):
-                self.fl <<= 1
-            elif (self.reg[reg_a] < self.reg[reg_b]):
-                self.fl <<= 2
+                # check if values are different
+                if (self.reg[reg_a] > self.reg[reg_b]):
+                    self.fl <<= 1
+                elif (self.reg[reg_a] < self.reg[reg_b]):
+                    self.fl <<= 2
+            elif self.ir == self.AND:
+                # Bitwise-AND the values in registerA and registerB, then store the result in registerA.
+                self.reg[reg_a] &= int(self.reg[reg_a]) & int(self.reg[reg_b])
+            elif self.ir == self.OR:
+                # Perform a bitwise-OR between the values in registerA and registerB, storing the result in registerA.
+                self.reg[reg_a] |= self.reg[reg_b]
+            elif self.ir == self.XOR:
+                # XOR between the values in registerA and registerB, storing the result in registerA
+                self.reg[reg_a] ^= self.reg[reg_b]
+            elif self.ir == self.NOT:
+                self.reg[reg_a] = ~self.reg[reg_a]
+            elif self.ir == self.SHL:
+                self.reg[reg_a] <<= self.reg[reg_b]
+            elif self.ir == self.SHR:
+                self.reg[reg_a] >>= self.reg[reg_b]
+            elif self.ir == self.MOD:
+                self.reg[reg_a] %= self.reg[reg_b]
+            
+            else:
+                raise Exception
 
-        else:
-            raise Exception("Unsupported ALU operation")
+        except:
+            print("Unsupported ALU operation")
+            sys.exit()
 
     def trace(self):
         """
@@ -321,4 +345,3 @@ class CPU:
             if not updated_pc:
                 # update program counter
                 self.pc += op_size
-
